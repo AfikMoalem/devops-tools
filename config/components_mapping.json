@@ -1,0 +1,7 @@
+[
+    {
+        "component_key": "KP-SlotMachine-V2",
+        "file_name_pattern": "slotmachine.{version}.min.js",
+        "path": "krembo/krembo_componentsV2/game_type/slotmachine/"
+    }
+]

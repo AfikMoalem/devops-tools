@@ -1,0 +1,70 @@
+# -----------------------------------------
+# Python cache / compiled
+# -----------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# -----------------------------------------
+# Virtual environments
+# -----------------------------------------
+venv/
+.venv/
+
+# -----------------------------------------
+# Testing (not needed in runtime image)
+# -----------------------------------------
+tests/
+test_*.py
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+pytest.ini
+
+# -----------------------------------------
+# IDE / Editor
+# -----------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# -----------------------------------------
+# OS files
+# -----------------------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------------------
+# Git
+# -----------------------------------------
+.git/
+.gitignore
+
+# -----------------------------------------
+# Logs & temp
+# -----------------------------------------
+*.log
+*.tmp
+*.bak
+
+# -----------------------------------------
+# Secrets (critical!)
+# Never include credentials in Docker build
+# -----------------------------------------
+.env
+.env.*
+*secret*.json
+*secret*.py
+*credentials*.json
+*credentials*.py
