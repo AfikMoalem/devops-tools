@@ -6,11 +6,10 @@ import json
 import os
 import tempfile
 from unittest.mock import MagicMock
-
 import pytest
 from botocore.exceptions import ClientError
 
-from s3_component_replacer import (
+from src.s3_component_replacer import (
     construct_file_name,
     construct_paths,
     copy_component_file,
@@ -59,7 +58,8 @@ class TestConstructFileName:
     def test_construct_file_name_basic(self):
         """Test basic file name construction"""
         assert (
-            construct_file_name("krembo.{version}.min.js", "19") == "krembo.19.min.js"
+            construct_file_name(
+                "krembo.{version}.min.js", "19") == "krembo.19.min.js"
         )
 
     def test_construct_file_name_different_patterns(self):
@@ -130,12 +130,10 @@ class TestFindComponentMapping:
         """Test finding exact component key match"""
         mappings = {
             "Component-A-V1": {
-                "file_name_pattern": "component-a.{version}.min.js",
-                "path": "components/component-a/",
+                "path_format": "/components/component-a/component-a.{0}.min.js",
             },
             "Component-B": {
-                "file_name_pattern": "component-b.{version}.min.js",
-                "path": "components/component-b/",
+                "path_format": "/components/component-b/component-b.{0}.min.js",
             },
         }
         result = find_component_mapping("Component-A-V1-19", mappings)
@@ -145,12 +143,10 @@ class TestFindComponentMapping:
         """Test that longest (most specific) match is returned"""
         mappings = {
             "Component-A": {
-                "file_name_pattern": "component-a.{version}.min.js",
-                "path": "components/component-a/",
+                "path_format": "/components/component-a/component-a.{0}.min.js",
             },
             "Component-A-V1": {
-                "file_name_pattern": "component-a-v1.{version}.min.js",
-                "path": "components/component-a-v1/",
+                "path_format": "/components/component-a-v1/component-a-v1.{0}.min.js",
             },
         }
         result = find_component_mapping("Component-A-V1-19", mappings)
@@ -161,8 +157,7 @@ class TestFindComponentMapping:
         """Test that None is returned when no match found"""
         mappings = {
             "Component-A-V1": {
-                "file_name_pattern": "component-a.{version}.min.js",
-                "path": "components/component-a/",
+                "path_format": "/components/component-a/component-a.{0}.min.js",
             }
         }
         result = find_component_mapping("Component-Unknown-123", mappings)
@@ -172,16 +167,13 @@ class TestFindComponentMapping:
         """Test best match when multiple keys could match"""
         mappings = {
             "Component": {
-                "file_name_pattern": "component.{version}.min.js",
-                "path": "components/",
+                "path_format": "/components/component.{0}.min.js",
             },
             "Component-B": {
-                "file_name_pattern": "component-b.{version}.min.js",
-                "path": "components/component-b/",
+                "path_format": "/components/component-b/component-b.{0}.min.js",
             },
             "Component-B-Wrapper": {
-                "file_name_pattern": "component-b-wrapper.{version}.min.js",
-                "path": "components/component-b-wrapper/",
+                "path_format": "/components/component-b-wrapper/component-b-wrapper.{0}.min.js",
             },
         }
         result = find_component_mapping("Component-B-Wrapper-227", mappings)
@@ -199,13 +191,11 @@ class TestLoadComponentMappings:
                 [
                     {
                         "component_key": "Component-A-V1",
-                        "file_name_pattern": "component-a.{version}.min.js",
-                        "path": "components/component-a/",
+                        "path_format": "/components/component-a/component-a.{0}.min.js",
                     },
                     {
                         "component_key": "Component-B",
-                        "file_name_pattern": "component-b.{version}.min.js",
-                        "path": "components/component-b/",
+                        "path_format": "/components/component-b/component-b.{0}.min.js",
                     },
                 ],
                 f,
@@ -218,8 +208,8 @@ class TestLoadComponentMappings:
             assert "Component-A-V1" in result
             assert "Component-B" in result
             assert (
-                result["Component-A-V1"]["file_name_pattern"]
-                == "component-a.{version}.min.js"
+                result["Component-A-V1"]["path_format"]
+                == "/components/component-a/component-a.{0}.min.js"
             )
         finally:
             os.unlink(temp_path)
@@ -245,12 +235,26 @@ class TestLoadComponentMappings:
         """Test that missing component_key raises ValueError"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(
-                [{"file_name_pattern": "test.{version}.min.js", "path": "test/"}], f
+                [{"path_format": "/test/test.{0}.min.js"}], f
             )
             temp_path = f.name
 
         try:
             with pytest.raises(ValueError, match="component_key"):
+                load_component_mappings(temp_path)
+        finally:
+            os.unlink(temp_path)
+
+    def test_load_component_mappings_missing_path_format(self):
+        """Test that missing path_format raises ValueError"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(
+                [{"component_key": "Component-A"}], f
+            )
+            temp_path = f.name
+
+        try:
+            with pytest.raises(ValueError, match="path_format"):
                 load_component_mappings(temp_path)
         finally:
             os.unlink(temp_path)
@@ -262,7 +266,8 @@ class TestLoadComponentNames:
     def test_load_component_names_valid_file(self):
         """Test loading valid component names file"""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(["Component-A-V1-19", "Component-B-227", "Component-F-202"], f)
+            json.dump(
+                ["Component-A-V1-19", "Component-B-227", "Component-F-202"], f)
             temp_path = f.name
 
         try:
@@ -304,8 +309,7 @@ class TestCopyComponentFile:
     def component_config(self):
         """Sample component configuration"""
         return {
-            "file_name_pattern": "component-a.{version}.min.js",
-            "path": "components/component-a/",
+            "path_format": "/components/component-a/component-a.{0}.min.js",
         }
 
     def test_copy_component_file_success(self, mock_s3_client, component_config):
@@ -393,7 +397,8 @@ class TestCopyComponentFile:
             if mock_s3_client.head_object.call_count == 1:
                 return {}  # Source exists
             else:
-                error_response = {"Error": {"Code": "404", "Message": "Not Found"}}
+                error_response = {
+                    "Error": {"Code": "404", "Message": "Not Found"}}
                 raise ClientError(error_response, "HeadObject")
 
         mock_s3_client.head_object.side_effect = side_effect
@@ -411,8 +416,7 @@ class TestCopyComponentFile:
 
     def test_copy_component_file_missing_config_field(self, mock_s3_client):
         """Test handling missing required config field"""
-        incomplete_config = {"file_name_pattern": "test.{version}.min.js"}
-        # Missing 'path' field
+        incomplete_config = {}  # Missing 'path_format' field
 
         result = copy_component_file(
             "Component-A-V1-19",
